@@ -1,19 +1,27 @@
 package com.easy.registry;
 
 import com.easy.config.RpcProperties;
+import com.example.etcd.config.EtcdProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
+import io.etcd.jetcd.kv.GetResponse;
+import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
+import org.springframework.cloud.client.ServiceInstance;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class EtcdRegistry implements Registry{
 
@@ -74,6 +82,28 @@ public class EtcdRegistry implements Registry{
 	}
 
 	@Override
+	public List<RpcProperties.ServiceInstance> discover(RpcProperties.ServiceInstance instance, String interfaceName) {
+		// 获取服务实例
+		List<RpcProperties.ServiceInstance> instances;
+		try {
+			KV kvClient = client.getKVClient();
+			instances = kvClient.get(ByteSequence.from(getKeyWithOutInstance(instance, interfaceName), StandardCharsets.UTF_8), GetOption.builder().isPrefix(true).build())
+					.thenApply(response -> response.getKvs().stream()
+							.map(kv -> {
+								try {
+									return JsonMapper.builder().build().readValue(kv.getValue().toString(StandardCharsets.UTF_8), RpcProperties.ServiceInstance.class);
+								} catch (JsonProcessingException e) {
+									throw new RuntimeException(e);
+								}
+							})
+							.toList()).join();
+			return instances;
+		} catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+	}
+
+	@Override
 	public void close() {
 		client.close();
 		scheduler.shutdown();
@@ -92,5 +122,15 @@ public class EtcdRegistry implements Registry{
 	 */
 	private String getKey(RpcProperties.ServiceInstance instance, String interfaceName) {
 		return "/" + registry.getNamespace() + "/" + interfaceName + "/" + instance.getVersion() + "/" + instance.getHost() + ":" + instance.getPort();
+	}
+
+	/**
+	 * 生成服务实例的唯一key {etc.namespace}/{interfaceName}/{version}
+	 * @param instance 服务实例
+	 * @param interfaceName 接口名称
+	 * @return 唯一key
+	 */
+	private String getKeyWithOutInstance(RpcProperties.ServiceInstance instance, String interfaceName) {
+		return "/" + registry.getNamespace() + "/" + interfaceName + "/" + instance.getVersion();
 	}
 }

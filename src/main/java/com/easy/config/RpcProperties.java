@@ -4,7 +4,9 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
+import java.util.Map;
 
+@Data
 @ConfigurationProperties(prefix = "easy.rpc")
 public class RpcProperties {
 
@@ -49,6 +51,10 @@ public class RpcProperties {
 	public static class ServiceInstance {
 
 		/**
+		 * 主机
+		 */
+		private String host;
+		/**
 		 * 端口
 		 */
 		private int port;
@@ -56,5 +62,9 @@ public class RpcProperties {
 		 * 版本
 		 */
 		private String version;
+		/**
+		 * 其他元数据信息
+		 */
+		private Map<String, String> metadata;
 	}
 }

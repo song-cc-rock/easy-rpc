@@ -27,6 +27,11 @@ public class EtcdRegistry implements Registry{
 	 * 用于取消注册时使用
 	 */
 	private final Map<String, Long> leaseMap = new ConcurrentHashMap<>();
+	/**
+	 * 存储key和对应的定时任务
+	 * 用于取消注册时取消对应任务
+	 */
+	private final Map<String, ScheduledFuture<?>> scheduledFutureMap = new ConcurrentHashMap<>();
 
 	private ScheduledExecutorService scheduler;
 
@@ -61,8 +66,9 @@ public class EtcdRegistry implements Registry{
 			kvClient.put(ByteSequence.from(key, StandardCharsets.UTF_8), ByteSequence.from(value, StandardCharsets.UTF_8),
 					PutOption.builder().withLeaseId(leaseId).build()).get();
 			// keep alive
-			scheduler.scheduleAtFixedRate(() -> leaseClient.keepAliveOnce(leaseId), 0, registry.getTtl() / 5, TimeUnit.SECONDS);
+			ScheduledFuture<?> scheduledFuture = scheduler.scheduleAtFixedRate(() -> leaseClient.keepAliveOnce(leaseId), 0, registry.getTtl() / 5, TimeUnit.SECONDS);
 			leaseMap.put(key, leaseId);
+			scheduledFutureMap.put(key, scheduledFuture);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -72,8 +78,18 @@ public class EtcdRegistry implements Registry{
 	public void deregister(String key) {
 		try {
 			kvClient.delete(ByteSequence.from(key, StandardCharsets.UTF_8)).get();
-			leaseClient.revoke(leaseMap.get(key)).get();
-			scheduler.shutdown();
+			Long leaseId = leaseMap.get(key);
+			if (leaseId != null) {
+				// 取消租约
+				leaseClient.revoke(leaseId).get();
+				leaseMap.remove(key);
+			}
+			ScheduledFuture<?> scheduledFuture = scheduledFutureMap.get(key);
+			if (scheduledFuture != null) {
+				// 取消定时任务续租
+				scheduledFuture.cancel(true);
+				scheduledFutureMap.remove(key);
+			}
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -86,15 +102,14 @@ public class EtcdRegistry implements Registry{
 		try {
 			KV kvClient = client.getKVClient();
 			instances = kvClient.get(ByteSequence.from(getKeyWithOutInstance(instance, interfaceName), StandardCharsets.UTF_8), GetOption.builder().isPrefix(true).build())
-					.thenApply(response -> response.getKvs().stream()
-							.map(kv -> {
-								try {
-									return JsonMapper.builder().build().readValue(kv.getValue().toString(StandardCharsets.UTF_8), RpcProperties.ServiceInstance.class);
-								} catch (JsonProcessingException e) {
-									throw new RuntimeException(e);
-								}
-							})
-							.toList()).join();
+					.get().getKvs().stream()
+					.map(kv -> {
+						try {
+							return JsonMapper.builder().build().readValue(kv.getValue().toString(StandardCharsets.UTF_8), RpcProperties.ServiceInstance.class);
+						} catch (JsonProcessingException e) {
+							throw new RuntimeException(e);
+						}
+					}).toList();
 			return instances;
 		} catch (Exception e) {
 			throw new RuntimeException(e.getMessage());

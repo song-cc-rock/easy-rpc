@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(RpcProperties.class)
 public class RpcAutoConfiguration {
 
-	@Bean
+	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(name = "easy.rpc.enabled", havingValue = "true")
 	public Registry registryService(RpcProperties props) {

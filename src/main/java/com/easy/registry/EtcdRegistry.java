@@ -1,27 +1,20 @@
 package com.easy.registry;
 
 import com.easy.config.RpcProperties;
-import com.example.etcd.config.EtcdProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
-import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
-import org.springframework.cloud.client.ServiceInstance;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 public class EtcdRegistry implements Registry{
 
@@ -29,7 +22,12 @@ public class EtcdRegistry implements Registry{
 	private Client client;
 	private KV kvClient;
 	private Lease leaseClient;
-	private long leaseId;
+	/**
+	 * 存储key和对应的租约ID
+	 * 用于取消注册时使用
+	 */
+	private final Map<String, Long> leaseMap = new ConcurrentHashMap<>();
+
 	private ScheduledExecutorService scheduler;
 
 	@Override
@@ -54,7 +52,7 @@ public class EtcdRegistry implements Registry{
 	public void register(RpcProperties.ServiceInstance instance, String interfaceName) {
 		try {
 			// get lease
-			leaseId = leaseClient.grant(registry.getTtl()).get().getID();
+			long leaseId = leaseClient.grant(registry.getTtl()).get().getID();
 			/*
 			 * /ns/interface/version/host:port → instance metadata
 			 */
@@ -64,17 +62,17 @@ public class EtcdRegistry implements Registry{
 					PutOption.builder().withLeaseId(leaseId).build()).get();
 			// keep alive
 			scheduler.scheduleAtFixedRate(() -> leaseClient.keepAliveOnce(leaseId), 0, registry.getTtl() / 5, TimeUnit.SECONDS);
+			leaseMap.put(key, leaseId);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
 
 	@Override
-	public void deregister(RpcProperties.ServiceInstance instance, String interfaceName) {
+	public void deregister(String key) {
 		try {
-			String key = getKey(instance, interfaceName);
 			kvClient.delete(ByteSequence.from(key, StandardCharsets.UTF_8)).get();
-			leaseClient.revoke(leaseId).get();
+			leaseClient.revoke(leaseMap.get(key)).get();
 			scheduler.shutdown();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -115,12 +113,23 @@ public class EtcdRegistry implements Registry{
 	}
 
 	/**
+	 * 获取服务实例的唯一key {etc.namespace}/{interfaceName}/{version}/{host}:{port}
+	 * @param instance 服务实例
+	 * @param interfaceName 接口名称
+	 * @return 服务实例Key
+	 */
+	@Override
+	public String getServiceKey(RpcProperties.ServiceInstance instance, String interfaceName) {
+		return getKey(instance, interfaceName);
+	}
+
+	/**
 	 * 生成服务实例的唯一key {etc.namespace}/{interfaceName}/{version}/{host}:{port}
 	 * @param instance 服务实例
 	 * @param interfaceName 接口名称
 	 * @return 唯一key
 	 */
-	private String getKey(RpcProperties.ServiceInstance instance, String interfaceName) {
+	public String getKey(RpcProperties.ServiceInstance instance, String interfaceName) {
 		return "/" + registry.getNamespace() + "/" + interfaceName + "/" + instance.getVersion() + "/" + instance.getHost() + ":" + instance.getPort();
 	}
 
@@ -130,7 +139,7 @@ public class EtcdRegistry implements Registry{
 	 * @param interfaceName 接口名称
 	 * @return 唯一key
 	 */
-	private String getKeyWithOutInstance(RpcProperties.ServiceInstance instance, String interfaceName) {
+	public String getKeyWithOutInstance(RpcProperties.ServiceInstance instance, String interfaceName) {
 		return "/" + registry.getNamespace() + "/" + interfaceName + "/" + instance.getVersion();
 	}
 }

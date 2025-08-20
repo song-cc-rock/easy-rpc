@@ -22,10 +22,9 @@ public interface Registry {
 
 	/**
 	 * 注销服务实例
-	 * @param instance 服务实例
-	 * @param interfaceName 接口名称
+	 * @param key 服务Key
 	 */
-	void deregister(RpcProperties.ServiceInstance instance, String interfaceName);
+	void deregister(String key);
 
 	/**
 	 * 发现服务实例
@@ -46,4 +45,11 @@ public interface Registry {
 	 */
 	String type();
 
+	/**
+	 * 获取服务Key
+	 * @param instance 服务实例
+	 * @param interfaceName 接口名称
+	 * @return Key
+	 */
+	String getServiceKey(RpcProperties.ServiceInstance instance, String interfaceName);
 }

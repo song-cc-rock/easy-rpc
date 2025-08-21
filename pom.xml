@@ -10,9 +10,10 @@
         <relativePath/>
     </parent>
 
+    <packaging>jar</packaging>
     <groupId>com</groupId>
     <artifactId>easy-rpc</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
     <name>easy-rpc</name>
 
     <properties>

@@ -13,7 +13,9 @@ public final class RegistryLoader {
 		ServiceLoader<Registry> loader = ServiceLoader.load(Registry.class);
 		Registry first = null;
 		for (Registry rs : loader) {
-			if (first == null) first = rs;
+			if (first == null) {
+				first = rs;
+			}
 			if (registry.getType().equals(rs.type())) {
 				rs.init(registry);
 				return rs;

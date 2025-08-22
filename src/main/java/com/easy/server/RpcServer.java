@@ -2,11 +2,10 @@ package com.easy.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Message;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetSocket;
-import io.vertx.core.buffer.Buffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rpc.Rpc;
@@ -39,16 +38,6 @@ public class RpcServer {
 		server.listen(port, host);
 		log.info("RPC Server started on port {} (tcp)", port);
 		return server;
-	}
-
-	/**
-	 * 停止RPC服务器
-	 * @param server NetServer 实例
-	 */
-	public void stop(NetServer server) {
-		if (server != null) {
-			server.close();
-		}
 	}
 
 	/**

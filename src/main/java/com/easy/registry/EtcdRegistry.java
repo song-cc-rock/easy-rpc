@@ -9,6 +9,7 @@ import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
+import org.springframework.lang.NonNull;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -45,7 +46,7 @@ public class EtcdRegistry implements Registry{
 		this.scheduler = new ScheduledThreadPoolExecutor(2, new ThreadFactory() {
 			final AtomicInteger threadCount = new AtomicInteger(1);
 			@Override
-			public Thread newThread(Runnable r) {
+			public Thread newThread(@NonNull Runnable r) {
 				Thread thread = new Thread(r, "etcd-lease-" + threadCount.getAndIncrement());
 				thread.setDaemon(true);
 				return thread;

@@ -1,49 +1,33 @@
 package com.easy.provider;
 
-import com.easy.annotation.Service;
 import com.easy.config.RpcProperties;
 import com.easy.registry.Registry;
 import com.easy.registry.RegistryLoader;
 import com.easy.server.RpcServer;
 import io.vertx.core.net.NetServer;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
-import org.springframework.beans.factory.config.BeanPostProcessor;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class RpcProvider implements BeanPostProcessor, SmartInitializingSingleton, AutoCloseable {
+public class RpcProvider implements SmartInitializingSingleton, AutoCloseable {
 
 	private final RpcProperties rpcProperties;
 	private final Registry registry;
-	private final Map<String, Object> serviceMap = new HashMap<>();
+	private final ServiceProcessor serviceProcessor;
 	private final List<NetServer> netServers = new CopyOnWriteArrayList<>();
 	private final List<String> registryKeys = new CopyOnWriteArrayList<>();
 
-	public RpcProvider(RpcProperties rpcProperties) {
+	public RpcProvider(RpcProperties rpcProperties, ServiceProcessor serviceProcessor) {
 		this.rpcProperties = rpcProperties;
+		this.serviceProcessor = serviceProcessor;
 		this.registry = RegistryLoader.load(rpcProperties.getRegistry());
 	}
 
 	@Override
-	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-		Class<?> targetClass = AopUtils.getTargetClass(bean);
-		Service easyService = targetClass.getAnnotation(Service.class);
-		if (easyService != null) {
-			Class<?>[] interfaces = targetClass.getInterfaces();
-			for (Class<?> is : interfaces) {
-				serviceMap.put(is.getName(), is);
-			}
-		}
-		return bean;
-	}
-
-	@Override
 	public void afterSingletonsInstantiated() {
+		Map<String, Object> serviceMap = serviceProcessor.getServiceMap();
 		if (serviceMap.isEmpty()) {
 			return;
 		}
@@ -78,5 +62,6 @@ public class RpcProvider implements BeanPostProcessor, SmartInitializingSingleto
 			}
 		}
 		netServers.clear();
+		registry.close();
 	}
 }

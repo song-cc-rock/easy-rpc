@@ -1,6 +1,8 @@
 package com.easy.server;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Message;
 import io.vertx.core.Vertx;
 import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetSocket;
@@ -16,6 +18,8 @@ public class RpcServer {
 
 	private final Vertx vertx = Vertx.vertx();
 	private final Map<String, Object> serviceMap;
+	private final ObjectMapper objectMapper = new ObjectMapper();
+
 
 	private static final Logger log = LoggerFactory.getLogger(RpcServer.class);
 
@@ -67,13 +71,20 @@ public class RpcServer {
 					// method not found
 					response.setCode(404).setMsg("Method not found: " + request.getMethodName());
 				} else {
+					// 参数反序列化
+					Class<?>[] paramTypes = method.getParameterTypes();
 					Object[] args = new Object[request.getParamsCount()];
-					for (int i = 0; i < request.getParamsList().size(); i++) {
-						args[i] = new String(request.getParams(i).toByteArray());
+					for (int i = 0; i < args.length; i++) {
+						byte[] raw = request.getParams(i).toByteArray();
+						args[i] = objectMapper.readValue(raw, paramTypes[i]);
 					}
 					Object result = method.invoke(obj, args);
-					byte[] out = (result == null) ? new byte[0] : result.toString().getBytes();
-					response.setCode(200).setData(ByteString.copyFrom(out));
+					if (result != null) {
+						byte[] out = objectMapper.writeValueAsBytes(result);
+						response.setCode(200).setData(ByteString.copyFrom(out));
+					} else {
+						response.setCode(200);
+					}
 				}
 			}
 			socket.write(Buffer.buffer(response.build().toByteArray()));

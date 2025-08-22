@@ -5,6 +5,8 @@ import io.vertx.core.Vertx;
 import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetSocket;
 import io.vertx.core.buffer.Buffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import rpc.Rpc;
 
 import java.lang.reflect.Method;
@@ -14,6 +16,8 @@ public class RpcServer {
 
 	private final Vertx vertx = Vertx.vertx();
 	private final Map<String, Object> serviceMap;
+
+	private static final Logger log = LoggerFactory.getLogger(RpcServer.class);
 
 	public RpcServer(Map<String, Object> serviceMap) {
 		this.serviceMap = serviceMap;
@@ -29,6 +33,7 @@ public class RpcServer {
 		NetServer server = vertx.createNetServer()
 				.connectHandler(socket -> socket.handler(buf -> handle(buf, socket)));
 		server.listen(port, host);
+		log.info("RPC Server started on port {} (tcp)", port);
 		return server;
 	}
 

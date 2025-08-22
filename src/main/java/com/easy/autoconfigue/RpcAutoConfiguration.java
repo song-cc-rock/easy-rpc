@@ -11,34 +11,37 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 @Configuration
 @EnableConfigurationProperties(RpcProperties.class)
 public class RpcAutoConfiguration {
 
+	@Lazy
 	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
-	public RpcProvider rpcProvider(RpcProperties props) {
+	@ConditionalOnProperty(name = "easy.rpc.enabled", havingValue = "true")
+	public static RpcProvider rpcProvider(RpcProperties props) {
 		return new RpcProvider(props);
 	}
 
 	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(name = "easy.rpc.enabled", havingValue = "true")
-	public Registry registryService(RpcProperties props) {
+	public static Registry registryService(RpcProperties props) {
 		return RegistryLoader.load(props.getRegistry());
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(name = "easy.rpc.enabled", havingValue = "true")
-	public RpcClient rpcClient(Registry registry, RpcProperties props) {
+	public static RpcClient rpcClient(Registry registry, RpcProperties props) {
 		return new RpcClient(registry, props.getInstance());
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
-	public ReferenceProcessor referenceProcessor(RpcClient rpcClient) {
+	public static ReferenceProcessor referenceProcessor(RpcClient rpcClient) {
 		return new ReferenceProcessor(rpcClient);
 	}
 }

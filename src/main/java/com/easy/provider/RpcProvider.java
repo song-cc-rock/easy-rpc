@@ -6,6 +6,7 @@ import com.easy.registry.Registry;
 import com.easy.registry.RegistryLoader;
 import com.easy.server.RpcServer;
 import io.vertx.core.net.NetServer;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -30,11 +31,12 @@ public class RpcProvider implements BeanPostProcessor, SmartInitializingSingleto
 
 	@Override
 	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-		Service easyService = bean.getClass().getAnnotation(Service.class);
+		Class<?> targetClass = AopUtils.getTargetClass(bean);
+		Service easyService = targetClass.getAnnotation(Service.class);
 		if (easyService != null) {
-			Class<?>[] interfaces = easyService.getClass().getInterfaces();
+			Class<?>[] interfaces = targetClass.getInterfaces();
 			for (Class<?> is : interfaces) {
-				serviceMap.put(is.getSimpleName(), is);
+				serviceMap.put(is.getName(), is);
 			}
 		}
 		return bean;

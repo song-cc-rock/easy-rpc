@@ -3,7 +3,6 @@ package com.easy.registry;
 import com.easy.config.RpcProperties;
 
 import java.util.List;
-import java.util.Map;
 
 public interface Registry {
 
